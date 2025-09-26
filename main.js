@@ -47,8 +47,8 @@ async function main() {
     for (const alg of ALGORITMOS) {
         const r = resultadosFinais[alg];
         console.log(`\n${alg}:`);
-        console.log(`  Tamanho médio gerado: ${r.mediaTamanhoGerado.toFixed(2)} bytes`);
-        console.log(`  Ocupação média: ${r.mediaOcupacao.toFixed(2)}%`);
+        console.log(`  Tamanho médio dos processos: ${r.mediaTamanhoGerado.toFixed(2)} `);
+        console.log(`  Ocupação média da memória: ${r.mediaOcupacao.toFixed(2)}%`);
         console.log(`  Taxa de descarte: ${r.mediaTaxaDescarte.toFixed(2)}%`);
     }
     console.log('======================================================');
