@@ -1,61 +1,81 @@
 const Memoria = require('./Memoria.js');
 const GeradorDeProcessos = require('./GeradorDeProcessos.js');
 
-/**
- * Executa uma simulação de alocação de memória.
- * @param {string} algoritmo O algoritmo a ser usado.
- * @returns {object|null} Métricas da simulação ou null se nenhum processo alocado.
- */
 function simular(algoritmo) {
-    const DURACAO_SEGUNDOS = 100;
-    const TAMANHO_MEMORIA = 2000; // Aumentado para reduzir fragmentação
-    const PROCESSOS_POR_SEGUNDO = 1; // Menos processos para evitar fragmentação extrema
-
-    const memoria = new Memoria(TAMANHO_MEMORIA);
+    const memoria = new Memoria(1000);
     const gerador = new GeradorDeProcessos();
-
-    let processosGerados = [];
-    let processosAlocados = new Map();
+    const ocupacaoPorSegundo = [];
+    const processosGerados = [];
     let processosDescartados = 0;
-    let ocupacaoPorSegundo = [];
+    const processosAlocados = new Map();
 
-    for (let s = 0; s < DURACAO_SEGUNDOS; s++) {
-        // Criação e alocação
-        for (let i = 0; i < PROCESSOS_POR_SEGUNDO; i++) {
-            const p = gerador.gerar();
-            processosGerados.push(p);
-            const alocou = memoria.alocar(p, algoritmo);
-            if (alocou) processosAlocados.set(p.id, p);
-            else processosDescartados++;
-        }
-
-        // Remoção de processos aleatórios
-        if (processosAlocados.size > 0) {
-            const numRemover = Math.min(processosAlocados.size, Math.random() < 0.5 ? 1 : 2);
-            const ids = Array.from(processosAlocados.keys());
-
-            for (let i = 0; i < numRemover; i++) {
-                const idx = Math.floor(Math.random() * ids.length);
-                const idRemover = ids.splice(idx, 1)[0];
-                memoria.liberar(idRemover);
-                processosAlocados.delete(idRemover);
+    for (let segundo = 0; segundo < 100; segundo++) {
+        // Gera 2 processos por segundo
+        for (let i = 0; i < 2; i++) {
+            const processo = gerador.gerar();
+            processosGerados.push(processo);
+            
+            try {
+                const alocado = memoria.alocar(processo, algoritmo);
+                if (alocado) {
+                    processosAlocados.set(processo.id, processo);
+                } else {
+                    processosDescartados++;
+                }
+            } catch (error) {
+                processosDescartados++;
             }
         }
 
-        ocupacaoPorSegundo.push(memoria.getOcupacao());
+        // Remove 1-2 processos aleatórios
+        if (processosAlocados.size > 0) {
+            const numRemover = Math.random() < 0.5 ? 1 : Math.min(2, processosAlocados.size);
+            const idsParaRemover = Array.from(processosAlocados.keys());
+            let removidos = 0;
+
+            for (let i = 0; i < numRemover && idsParaRemover.length > 0; i++) {
+                const randomIndex = Math.floor(Math.random() * idsParaRemover.length);
+                const id = idsParaRemover[randomIndex];
+                
+                idsParaRemover.splice(randomIndex, 1);
+                
+                if (processosAlocados.has(id)) {
+                    try {
+                        memoria.liberar(id);
+                        processosAlocados.delete(id);
+                        removidos++;
+                    } catch (error) {
+                        // Silencia erros de liberação
+                    }
+                }
+            }
+        }
+
+        // Coleta métrica de ocupação
+        try {
+            const ocupacao = memoria.getOcupacao();
+            ocupacaoPorSegundo.push(ocupacao);
+        } catch (error) {
+            ocupacaoPorSegundo.push(0);
+        }
     }
 
-    if (processosGerados.length === 0) return null;
-
-    const tamanhoMedio = processosGerados.reduce((s, p) => s + p.tamanho, 0) / processosGerados.length;
-    const ocupacaoMedia = ocupacaoPorSegundo.reduce((s, o) => s + o, 0) / ocupacaoPorSegundo.length;
-    const taxaDescarte = (processosDescartados / processosGerados.length) * 100;
-
-    return {
-        tamanhoMedioGerado: tamanhoMedio,
-        ocupacaoMedia,
-        taxaDescarte
+    // Cálculo das métricas finais
+    const totalProcessos = processosGerados.length;
+    
+    const metricas = {
+        tamanhoMedioGerado: totalProcessos > 0 
+            ? processosGerados.reduce((s, p) => s + p.tamanho, 0) / totalProcessos 
+            : 0,
+        ocupacaoMedia: ocupacaoPorSegundo.length > 0
+            ? ocupacaoPorSegundo.reduce((s, o) => s + o, 0) / ocupacaoPorSegundo.length
+            : 0,
+        taxaDescarte: totalProcessos > 0
+            ? (processosDescartados / totalProcessos) * 100
+            : 0
     };
+
+    return metricas;
 }
 
 module.exports = simular;
